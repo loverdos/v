@@ -1,0 +1,14 @@
+This is to replace the old 'v' script, which mixed code and data in one
+flat file (very bad idea....) and is now completely unsupported.
+
+Place .metaview??? files in your home directory.
+Until proper documentation comes up, I believe that the straighforward
+appearance of .metaview??? files will help you understand their use!
+
+Note that the script needs a version of grep that understands the -P 
+switch (Perl-compatible regular expressions)
+
+
+I am developing this thing under Linux.
+
+Christos KK Loverdos

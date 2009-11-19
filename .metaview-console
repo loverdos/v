@@ -1,0 +1,34 @@
+[By-Extension]
+# Text
+.txt : vim vi emacs xemacs joe
+.me  : vim vi emacs xemacs joe
+.vim : vim
+
+<directory> : vim mc lynx
+
+# Archives
+.tar.gz : TARZ
+.tar.z  : TARZ
+.tgz    : TARZ
+.tar.bz2: TARJ
+.tbz2   : TARJ
+.jar    : UNZIP
+.zip    : UNZIP
+.lha    : LHA
+.lzh    : LHA
+
+.htm  : lynx links vim
+.html : lynx links vim
+
+.rpm : RPMQI
+
+[By-MIME]
+text/* : vim vi emacs xemacs joe
+application/x-shellscript: vim vi emacs xemacs joe
+
+[Programs]
+TARZ : tar tvfz
+TARJ : tar tvfj
+UNZIP: unzip -l
+LHA  : lha -tvf
+RPMQI: rpm -qilp

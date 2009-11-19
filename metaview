@@ -1,0 +1,450 @@
+#!/bin/bash
+
+# This script supercedes the 'v' script. It offers more flexibility and
+# better data/code separation
+
+# Copyright (c) 2003-2004 Christos KK Loverdos (loverdos@di.uoa.gr)
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+#
+# Author     : Christos KK Loverdos (loverdos@di.uoa.gr)
+# Started    : 2003/11/16
+# Version    : 0.3.1
+# Build      : 4
+#
+###############
+# CHANGELOG   #
+######################################################################
+#v0.3.1 Build 4: 2004/02/15
+#- Added external dependencies bold(), cfail(), fechon() etc. inplace
+#
+#v0.3.1 Build 3: 2004/02/08
+#- Added <Build> numbers in versions. A <Build> always increases by 1
+#- Option -t now implies -v
+#
+#v0.3.1 Build 2: 2004/01/24
+#- Added <-t> option: just test and do not call any program
+#- Minor fixes in the MIME type handling (MIME="${MIME%,*}" --> MIME="${MIME%%,*}")
+#- Echoing [$(pwd)] in each ~/.metaviewlog entry
+#
+#v0.3 Build 1: 2003/11/16
+#- Started basic reimplementation of old v script
+######################################################################
+
+[ "$1" == "--help" -o "$1" == "-h" -o -z "$1" ] &&
+{
+	echo "$(basename $0) --help|-h *"
+	echo "$(basename $0) [options] files*"
+	echo -e "    -f <resource-file> Which RC to consider."
+    echo -e "                       Defaults are ./.metaviewrc and ~/.metaviewrc"
+	echo -e "    -m <module-name>   Which module to use. Default is console"
+	echo -e "    -s|--synch         Tries to call the viewer synchronously"
+	echo -e "                       [depends on the viewer!]"
+	echo -e "    -v                 Show what executable is called"
+	echo -e "    -vv                Show the decision process"
+	echo -e "    -vvv               Be more verbose"
+	echo -e "    -t                 Test only. Implies -v"
+	exit
+}
+
+#+Shell utility functions
+function bold()
+{
+	echo "\033[1m$*\033[0m"
+}
+
+function cfail()
+{
+	echo "\\033[1;31m$*\033[0m"
+}
+
+function cnorm()
+{
+	echo "\\033[0;39m$*"
+}
+
+function fechon()
+{
+	echo -en "$*$(cnorm)\n"
+}
+#-Shell utility functions
+
+
+function DEBUG()
+{
+	local localVERBOSE=1
+	local plainECHO
+	local noheader
+	
+	if [ -n "$VERBOSE" ]; then
+		[ "$1" == "0" -o "$1" == "1" -o "$1" == "2" ] && localVERBOSE=$1 && shift
+		[ "$1" == "--plain" ] && plainECHO=1 && shift
+		[ "$1" == "--noheader" ] && noheader=1 && shift
+		
+		if [ "$VERBOSE" -ge "$localVERBOSE" ]; then 
+			if [ -n ""$plainECHO ]; then
+				echo "$@"
+			else
+				if [ -n "$noheader" ]; then
+					fechon "$@"
+				else
+					fechon "$(cfail [DEBUG] -) "$@""
+				fi
+			fi
+		fi
+	fi
+}
+
+# Locate the first existing RC file
+# Used for two types of RCs: .metaviewrc and .metaview-<SUFFIX>, where
+# <SUFFIX> is the specification of a module (like: console)
+function FindRC()
+{
+	#DEBUG "$@"
+	local RC
+	local SUFFIX
+	local DIR
+
+	if [ "$1" == "--suffix" ]; then
+		SUFFIX="$2"
+		shift 2
+	fi
+	
+	for DIR in "" ./ ~/; do
+		for RC in $*; do
+			RC="$DIR$RC$SUFFIX"
+			if [ -e "$RC" ]; then
+				#DEBUG found: $RC
+				echo "$RC"
+				return
+			fi
+		done # RC
+	done # DIR
+
+	echo ""
+}
+
+function TryEXE()
+{
+	local exe="$(echo $1)"
+	shift
+	local args="$@"
+	local mv_exetype_name="mv_exetype_$mv_use_module"
+	local mv_exetype=${!mv_exetype_name}
+	
+	DEBUG 2 using $mv_exetype
+	DEBUG 0 --noheader "$(cfail [)$(bold $exe) $args$(cfail ])"
+	if [ -n "$SYNCHRONOUS" ]; then
+		exec $exe "$args"
+	else
+		if [ -z "$TESTONLY" ]; then
+			case $mv_exetype in
+				RunEXE)  exec $exe "$args";;
+				RunEXE2) exec $exe "$args" &;;
+				RunEXE3) (exec $exe "$args" &);;
+			esac
+		else
+			DEBUG testing only!
+		fi
+	fi
+}
+
+# Look at the [Programs] section of a .metaview-MODULE file for 
+# a specific program description
+function FindEXEDescription()
+{
+	MODULERC="$1" && shift
+	MODULESPECS=$(sed -e '0,/^\[Programs\]/d' -e '/^\[/,$d' < "$MODULERC" | grep -v ^#)
+	
+	for EXE in $*; do
+		MATCHLINE=$(echo "$MODULESPECS"|grep -i -P "^$EXE\s*:")
+		
+		if [ -n "$MATCHLINE" ]; then
+			# For a line in the form:
+			# vim-R : vim -R
+			# the actual executable is "vim", so we isolate it and check if
+			# it exists
+			MATCHLINE="$MATCHLINE " # Trick for ACTUAL_EXE to work, since its seperation is based on spaces
+			ACTUAL_EXE_SPEC=${MATCHLINE#*:}   # vim -R
+			ACTUAL_EXE=${ACTUAL_EXE_SPEC%\ *} # vim
+		else
+			# There was no specification in [Programs] sections, so
+			# then $EXE is the actual executable
+			ACTUAL_EXE_SPEC="$EXE"
+			ACTUAL_EXE="$EXE"
+		fi
+
+		# Does it exist?
+		if [ -n "$(which $ACTUAL_EXE 2>/dev/null)" ]; then
+			echo "$ACTUAL_EXE_SPEC"
+			return
+		fi
+
+		# No, let's take a look at the next one
+	done
+
+	# Failed to find an executable
+	echo ""
+}
+
+function ViewForModule()
+{
+	local EXE
+	local MODULERC
+	local MODULESPECS_NAME
+	local MODULESPECS_MIME
+	local SEARCH_NAME
+	local SEARCH_NAME_LC
+	local MATCHLINE
+	local SUFFIX
+	local NEWSUFFIX
+
+	MODULERC="$1" && shift
+
+	while [ $# -gt 0 -a ! -f "$1" -a ! -d "$1" ]; do
+		fechon $(bold $1) is not a file or folder
+		shift
+	done
+
+	[ $# -eq 0 ] && return 1
+
+	# get all the specifications from .metaview-MODULE
+	if [ -z "$MODULESPECS_NAME" ]; then
+		MODULESPECS_NAME=$(sed -e '0,/^\[By-Extension\]/d' -e '/^\[/,$d' < "$MODULERC" | grep -v ^#)
+	fi
+	DEBUG 2 MODULESPECS_NAME=
+	DEBUG 2 --plain "$MODULESPECS_NAME"
+
+	for NAME; do
+		EXE=
+
+		if [ ! -f "$NAME" -a ! -d "$NAME" ]; then
+			fechon $(bold $NAME) is not a file or folder
+			continue
+		fi
+
+		if [ -d "$NAME" ]; then
+			SEARCH_NAME='<DIRECTORY>'
+		else
+			SEARCH_NAME="$NAME"
+		fi
+
+		SEARCH_NAME_LC="$(echo "$SEARCH_NAME" | tr [A-Z] [a-z])"
+		DEBUG $(bold [)$NAME$(bold ])
+
+		# Iterate through all spec lines, to find the appropriate handler
+				
+		# 1. try to find a name match
+		# 1a. try to find an exact name match
+		DEBUG checking for $(cfail exact match)
+		MATCHLINE=$(echo "$MODULESPECS_NAME"|grep -i -P "^$SEARCH_NAME\s*:")
+		if [ -n "$MATCHLINE" ]; then
+			DEBUG $(cfail exact) match at $(bold ["$MATCHLINE"])
+			EXELIST=${MATCHLINE#*:}
+			DEBUG 2 possible candidates are: $(bold $EXELIST)
+			EXE=$(FindEXEDescription $MODULERC "$EXELIST")
+			if [ -n "$EXE" ]; then
+				DEBUG found $(bold $EXE)
+				TryEXE "$EXE" "$NAME"
+				continue
+			fi
+		fi
+
+		# 1b. try to find a .SUFFIX match
+		DEBUG "checking for $(cfail suffix match)"
+		SUFFIX="$SEARCH_NAME_LC" # like foo.tar.gz
+		while true; do
+			DEBUG 2 checking SUFFIX=".$SUFFIX"
+
+			MATCHLINE=$(echo "$MODULESPECS_NAME"|grep -i -P "^\\.$SUFFIX\s*:")
+			if [ -n "$MATCHLINE" ]; then
+				DEBUG $(cfail suffix) match at $(bold ["$MATCHLINE"])
+				EXELIST="${MATCHLINE#*:}"
+				DEBUG 2 possible candidates are: $(bold $EXELIST)
+				EXE=$(FindEXEDescription $MODULERC "$EXELIST")
+
+				if [ -n "$EXE" ]; then
+					DEBUG found $(bold $EXE)
+					TryEXE "$EXE" "$NAME"
+					break
+				fi
+			fi
+			
+			NEWSUFFIX="${SUFFIX#*.}" # like .tar.gz
+			if [ "$NEWSUFFIX" == "$SUFFIX" ]; then
+				#DEBUG NEWSUFFIX==$SUFFIX [$SUFFIX]
+				break
+			fi
+
+			# try next longest suffix (gz in the case of tar.gz)
+			SUFFIX="$NEWSUFFIX"
+		done
+		
+		if [ -n "$EXE" ]; then
+			#DEBUG "EXE=$EXE, continue"
+			continue
+		fi
+		
+		# Had a <DIRECTORY> but could not find an entry in MODULESPECS
+		if [ "$NAME" == "<DIRECTORY>" ]; then
+			echo No entry for a Directory >&2
+			return 1
+		fi
+
+		# 2. try to find a MIME type match
+		DEBUG checking for $(cfail MIME match)
+		if [ -z "$MODULESPECS_MIME" ]; then
+			MODULESPECS_MIME=$(sed -e '0,/^\[By-MIME\]/d' -e '/^\[/,$d' < "$MODULERC" | grep -v ^#)
+		fi
+		DEBUG 2 MODULESPECS_MIME=
+		DEBUG 2 --plain "$MODULESPECS_MIME"
+		MIME="$(file -biL "$NAME" 2>/dev/null)"
+		MIME="${MIME%%;*}" # throw away <; charset=us-ascii> stuff
+		MIME="${MIME%%,*}" # throw away <, English> stuff (as in <text/plain, English; charset=us-ascii>)
+		MIME_MAJOR=${MIME%/*}
+		MIME_MINOR=${MIME#*/}
+		DEBUG MIME=$(cfail $MIME) [$MIME_MAJOR/$MIME_MINOR]
+
+		# 2a. try to find a exact MIME type match
+		MATCHLINE=$(echo "$MODULESPECS_MIME"|grep -i -P "^$MIME\s*:")
+		if [ -n "$MATCHLINE" ]; then
+			DEBUG $(cfail MIME) match at $(bold ["$MATCHLINE"])
+			EXELIST=${MATCHLINE#*:}
+			DEBUG 2 possible candidates are: $(bold $EXELIST)
+			EXE=$(FindEXEDescription $MODULERC "$EXELIST")
+			if [ -n "$EXE" ]; then
+				DEBUG found $(bold $EXE)
+				TryEXE "$EXE" "$NAME"
+				continue
+			fi
+		fi
+
+		# 2a. try to find a partial MIME type match (ie text/*)
+		MATCHLINE=$(echo "$MODULESPECS_MIME"|grep -i "^$MIME_MAJOR/\*")
+		if [ -n "$MATCHLINE" ]; then
+			DEBUG $(cfail MIME) match at $(bold ["$MATCHLINE"])
+			EXELIST=${MATCHLINE#*:}
+			DEBUG 2 possible candidates are: $(bold $EXELIST)
+			EXE=$(FindEXEDescription $MODULERC "$EXELIST")
+			if [ -n "$EXE" ]; then
+				DEBUG found $(bold $EXE)
+				TryEXE "$EXE" "$NAME"
+				continue
+			fi
+		fi
+
+		# Nothing found!
+		echo unable to view \'$MIME\' $NAME >&2
+	done
+}
+
+TESTONLY=
+COMMANDLINE="$@"
+METAVIEWRCs=".metaviewrc"
+MODULERCs=".metaview-"
+
+# Consider any command-line given RC files (they take priority of the defaults)
+while true; do
+	case "$1" in
+		-f)   METAVIEWRCs="$2 "$METAVIEWRCs && shift 2;;
+		-m)   CMDLINE_mv_use_module="$2" && shift 2;;
+		-s|--sync)   SYNCHRONOUS=1 && shift;; # --sync is used by unzipAndView script
+		-v)   VERBOSE=0 && shift;;
+		-vv)  VERBOSE=1 && shift;;
+		-vvv) VERBOSE=2 && shift;;
+		-t)
+			TESTONLY=1
+			[ -z "$VERBOSE" ] && VERBOSE=0
+			shift;;
+		*)  break;;
+	esac
+done
+
+METAVIEWRC=$(FindRC $METAVIEWRCs)
+
+if [ -z "$METAVIEWRC" ]; then
+	echo No .metaviewrc found. Aborting
+	exit 1
+else
+	DEBUG METAVIEWRC is $METAVIEWRC
+	source "$METAVIEWRC"
+fi
+
+#+####################################
+# METAVIEWRC defines these variables:
+#
+# NAME: mv_use_module
+# USAGE:mv_use_module=moduleName
+# Specifies which module to use for viewing. In effect, the module name
+# defines the appropriate .metaview-<moduleName> RC file to be considered.
+# Sample modules provided are console and X.
+# If the -m command line arg is specified, it takes precedence over the
+# value in the METAVIEWRC file
+if [ -n "$CMDLINE_mv_use_module" ]; then
+	mv_use_module=$CMDLINE_mv_use_module
+fi
+if [ -z "$mv_use_module" -o -z "$DISPLAY" ]; then
+	mv_use_module=console
+	DEBUG 2 using fallback module $mv_use_module
+fi
+if [ "$(basename $0)" == "tv" ]; then
+	if [ "$mv_use_module" != "console" ]; then
+		DEBUG "bypassing module $mv_use_module for console"
+		mv_use_module=console
+	fi
+fi
+#
+# NAME: mv_exetype_<moduleName>
+# USAGE:mv_exetype_console=RunEXE(2|3)?
+# Specifies the 'technique' to be used when calling the executable.
+# Possible values are:
+#     RunEXE
+#     RunEXE2
+#     RunEXE3
+# as they are defined and used in the <v> script
+#-####################################
+
+# find .metaview-XXX where XXX is taken from $mv_use_module
+# e.g. .metaview-console, .metaview-X
+MODULERC=$(FindRC --suffix "$mv_use_module" $MODULERCs)
+if [ -n "$MODULERC" ]; then
+	DEBUG MODULERC is $MODULERC
+else
+	echo Could not find .metaview-$mv_use_module. Aborting.
+	exit 2
+fi
+
+if [ -n "$SYNCHRONOUS" ]; then
+	DEBUG 'SYNCHRONOUS mode is ON (Iwill try)'
+fi
+
+DEBUG 2 "$@"
+
+# Main Routine
+ViewForModule $MODULERC "$@"
+
+# !!Experimental
+# Log every invocation
+if [ ! -f ~/.metaviewlog -a ! -d ~/.metaviewlog ]; then
+	DEBUG creating ~/.metaviewlog
+	touch ~/.metaviewlog 2>/dev/null || DEBUG $(cfail Error) creating ~/.metaviewlog [permission denied?]
+fi
+
+if [ -f ~/.metaviewlog ]; then
+	DEBUG 2 updating ~/.metaviewlog
+	# doesnot reproduce names with spaces...
+	echo $(date +%Y%m%d-%H%M%S) [$(pwd)] $COMMANDLINE 2>/dev/null >> ~/.metaviewlog || DEBUG $(cfail Error) updating ~/.metaviewlog [permission denied?]
+
+fi

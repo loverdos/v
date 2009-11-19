@@ -1,0 +1,14 @@
+v0.3.1 Build 4: 2004/02/15
+	* Added external dependencies bold(), cfail(), fechon() etc. inplace
+
+v0.3.1 Build 3: 2004/02/08
+	* Added <Build> numbers in versions. A <Build> always increases by 1
+	* Option -t now implies -v
+
+v0.3.1 Build 2: 2004/01/24
+	* Added <-t> option: just test and do not call any program
+	* Minor fixes in the MIME type handling (MIME="${MIME%,*}" --> MIME="${MIME%%,*}")
+	* Echoing [$(pwd)] in each ~/.metaviewlog entry
+
+v0.3 Build 1: 2003/11/16
+	* Started basic reimplementation of old v script

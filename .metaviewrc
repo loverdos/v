@@ -1,0 +1,10 @@
+# use X apps by default
+mv_use_module=X
+
+# unused variables
+#mv_use_X="gnome kde plainX"
+#mv_gnome_chain="kde X"
+#mv_kde_chain="gnome X"
+
+mv_exetype_console=RunEXE
+mv_exetype_X=RunEXE3

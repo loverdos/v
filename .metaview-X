@@ -1,0 +1,108 @@
+[By-Extension]
+
+# Text
+.txt : vim vi emacs xemacs joe
+.me  : vim vi emacs xemacs joe
+.vim : vim
+.lyx : lyx klyx vim
+.dtd : vim vi emacs xemacs joe
+.fig : xfig jfig vim vi
+
+.pdf : xpdf kghostview gv ggv
+.ps  : kghostview gv ggv
+.ps1  : kghostview gv ggv
+.ps2  : kghostview gv ggv
+.ps3  : kghostview gv ggv
+.ps4  : kghostview gv ggv
+.ps5  : kghostview gv ggv
+.ps6  : kghostview gv ggv
+.ps7  : kghostview gv ggv
+.ps8  : kghostview gv ggv
+.ps9  : kghostview gv ggv
+.dvi : kdvi xdvi
+.eps : kghostview gv ggv
+
+.pdf.gz : kghostview gv ggv
+.pdf.bz2: unzipAndView
+.ps.gz : kghostview gv ggv
+.ps.bz2: unzipAndView
+
+.htm  : galeon konqueror nautilus opera
+.html : galeon konqueror nautilus opera
+
+.info : iyelp
+.man  : myelp
+.1    : myelp
+.2    : myelp
+.3    : myelp
+.4    : myelp
+.5    : myelp
+.6    : myelp
+.7    : myelp
+.8    : myelp
+.9    : myelp
+
+# Images
+.gif  : konqueror eog ee display
+
+<directory> : vim nautilus konqueror galeon
+
+# Archives
+.tar.gz : file-roller TARZ
+.tar.z  : file-roller TARZ
+.tgz    : file-roller TARZ
+.tar.bz2: file-roller TARJ
+.tbz2   : file-roller TARJ
+.jar    : file-roller UNZIP
+.zip    : file-roller UNZIP
+.lha    : file-roller LHA
+.lzh    : file-roller LHA
+
+.rpm : RPMQI
+
+# Office
+.sxw : ooffice
+.sxi : ooffice
+.rtf : ooffice
+.xls : ooffice
+.ppt : ooffice
+
+# Multimedia
+.wav : playwave play
+.mpg : mplayer plaympeg
+.wmv : mplayer
+.avi : mplayer
+.mov : mplayer
+
+[By-MIME]
+text/html : galeon konqueror nautilus opera
+
+application/x-shellscript: vim vi emacs xemacs joe
+application/x-perl       : vim vi emacs xemacs joe
+application/x-empty      : vim vi emacs xemacs joe
+
+application/x-zip : file-roller
+application/x-gzip: file-roller
+
+application/msword: ooffice
+
+video/*: mplayer
+
+text/*    : vim vi emacs xemacs joe
+message/* : vim vi emacs xemacs joe
+image/*   : eog ee display gimp
+
+[Programs]
+vim  : gvim
+
+TARZ : tar tvfz
+TARJ : tar tvfj
+UNZIP: unzip -l
+LHA  : lha -tvf
+
+RPMQI: rpm -qilp
+
+# String substitution using %s is to be supported in the next version
+iyelp: yelp info:%s
+myelp: yelp man:%s
+
